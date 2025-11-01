@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ali Institute – Saved Admissions</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .table-container {
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 5px 25px rgba(0,0,0,0.1);
+      padding: 20px;
+      margin-top: 30px;
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+    th, td {
+      padding: 10px 15px;
+      border-bottom: 1px solid #ddd;
+    }
+    th {
+      background: #007bff;
+      color: white;
+      position: sticky;
+      top: 0;
+    }
+    tr:hover {
+      background: #f1f1f1;
+    }
+    .back-btn {
+      display: inline-block;
+      background: #007bff;
+      color: white;
+      padding: 10px 15px;
+      border-radius: 10px;
+      text-decoration: none;
+      margin-bottom: 15px;
+    }
+    .back-btn:hover {
+      background: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="header">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/5/5a/Caduceus.svg" class="logo" alt="Logo">
+      <div class="title">
+        <h1>Ali Institute of Medical Sciences</h1>
+        <p>Hasilpur</p>
+      </div>
+    </header>
+
+    <section class="card">
+      <a href="/" class="back-btn">← Back to Admission Form</a>
+      <h2>Saved Admissions</h2>
+
+      <div class="table-container">
+        <table id="dataTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Name</th>
+              <th>Father Name</th>
+              <th>Class</th>
+              <th>Gender</th>
+              <th>Address</th>
+              <th>Phone</th>
+              <th>Interest</th>
+              <th>Timestamp</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p id="status" class="status"></p>
+    </section>
+
+    <footer class="footer">
+      <p>For Admission: <strong>0325-1021727</strong></p>
+    </footer>
+  </main>
+
+  <script>
+    async function loadData() {
+      const status = document.getElementById('status');
+      const tableBody = document.querySelector('#dataTable tbody');
+      status.textContent = 'Loading data...';
+
+      try {
+        // Fetch your data.json file directly from GitHub
+        const res = await fetch('/data/data.json');
+        if (!res.ok) throw new Error('Failed to fetch data.json');
+        const data = await res.json();
+
+        tableBody.innerHTML = '';
+        data.forEach((entry, i) => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${i + 1}</td>
+            <td>${entry.name || ''}</td>
+            <td>${entry.father || ''}</td>
+            <td>${entry.class || ''}</td>
+            <td>${entry.gender || ''}</td>
+            <td>${entry.address || ''}</td>
+            <td>${entry.phone || ''}</td>
+            <td>${entry.interest || ''}</td>
+            <td>${new Date(entry.timestamp).toLocaleString()}</td>
+          `;
+          tableBody.appendChild(row);
+        });
+
+        status.textContent = data.length
+          ? `Showing ${data.length} records`
+          : 'No admissions yet.';
+      } catch (err) {
+        status.textContent = 'Error loading data: ' + err.message;
+      }
+    }
+
+    loadData();
+  </script>
+</body>
+        </html>
