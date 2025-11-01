@@ -38,5 +38,15 @@
     "phone": "0300000000",
     "interest": "No",
     "_savedAt": "2025-11-01T14:09:35.433Z"
+  },
+  {
+    "name": "Muhammad Danish Rasool",
+    "father": "G Rasool",
+    "class": "12th",
+    "gender": "Male",
+    "address": "Sheli gharbi",
+    "phone": "03291001302",
+    "interest": "Yes",
+    "_savedAt": "2025-11-01T17:02:35.981Z"
   }
 ]
