@@ -8,5 +8,15 @@
     "phone": "03299931199",
     "interest": "Yes",
     "_savedAt": "2025-11-01T09:20:51.600Z"
+  },
+  {
+    "name": "Zaid",
+    "father": "Ff",
+    "class": "10",
+    "gender": "",
+    "address": "shaili gharbi",
+    "phone": "03299931199",
+    "interest": "No",
+    "_savedAt": "2025-11-01T09:24:29.455Z"
   }
 ]
