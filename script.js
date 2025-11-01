@@ -10,8 +10,8 @@ document.addEventListener('DOMContentLoaded', () => {
     statusEl.textContent = '';
 
     const data = Object.fromEntries(new FormData(form).entries());
-    if (!data.name || !data.father) {
-      statusEl.textContent = 'Please fill required fields.';
+    if (!data.name || !data.adminPassword) {
+      statusEl.textContent = 'Please fill all required fields.';
       btn.disabled = false;
       btn.textContent = 'Submit';
       return;
@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const result = await res.json();
       if (res.ok) {
         statusEl.style.color = 'green';
-        statusEl.textContent = '✅ Form submitted successfully!';
+        statusEl.textContent = '✅ Saved successfully!';
         form.reset();
       } else {
         statusEl.style.color = 'red';
