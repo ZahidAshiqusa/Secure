@@ -1,5 +1,4 @@
-// api/save.js
-// Vercel Serverless Function (Node). No external deps required.
+// Vercel Serverless Function — saves incoming entry to GitHub repo (data/data.json)
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -7,122 +6,89 @@ export default async function handler(req, res) {
   }
 
   try {
-    const body = req.body;
-    // expect: { entry: { name, father, class, gender, address, phone, interest, adminPassword } }
+    const body = await (async () => {
+      try { return typeof req.body === 'object' ? req.body : JSON.parse(await new Promise(r => { let d=''; req.on('data',c=>d+=c); req.on('end',()=>r(d)); })); }
+      catch (e) { return req.body; }
+    })();
+
     const entry = body?.entry;
-    if (!entry) return res.status(400).json({ error: 'Missing entry' });
-
-    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
-    if (!ADMIN_PASSWORD) {
-      return res.status(500).json({ error: 'Server not configured (ADMIN_PASSWORD missing)' });
+    if (!entry || !entry.name || !entry.father) {
+      return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Validate admin password
-    if (String(entry.adminPassword || '') !== String(ADMIN_PASSWORD)) {
-      return res.status(401).json({ error: 'Invalid admin password' });
-    }
-
-    // remove adminPassword from stored object
-    delete entry.adminPassword;
-
-    // augment entry with metadata
-    const timestamp = new Date().toISOString();
-    const record = {
-      ...entry,
-      _savedAt: timestamp
-    };
-
-    // GitHub config from env:
-    // GITHUB_TOKEN (personal access token, put as Vercel Secret),
-    // GITHUB_REPO (format: owner/repo),
-    // GITHUB_BRANCH (branch name; default: main)
-    const GITHUB_TOKEN = process.env.GITHUB_TOKEN || process.env.VERCEL_GITHUB_TOKEN || '';
-    const GITHUB_REPO = process.env.GITHUB_REPO || '';
+    const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+    const GITHUB_REPO = process.env.GITHUB_REPO; // "owner/repo"
     const GITHUB_BRANCH = process.env.GITHUB_BRANCH || 'main';
-    const FILE_PATH = (process.env.GITHUB_DATA_PATH || 'data/data.json');
+    const CLIENT_PASSWORD = process.env.CLIENT_PASSWORD;
 
     if (!GITHUB_TOKEN || !GITHUB_REPO) {
-      return res.status(500).json({ error: 'GitHub integration not configured (GITHUB_TOKEN or GITHUB_REPO missing)' });
+      return res.status(500).json({ error: 'GitHub configuration missing in env (GITHUB_TOKEN or GITHUB_REPO)' });
     }
+    if (!CLIENT_PASSWORD) {
+      return res.status(500).json({ error: 'Server requires CLIENT_PASSWORD env variable' });
+    }
+
+    // Validate client password
+    if (String(entry.clientpass || '') !== String(CLIENT_PASSWORD)) {
+      return res.status(401).json({ error: 'Invalid client password' });
+    }
+
+    // Clean clientpass before saving
+    delete entry.clientpass;
 
     const [owner, repo] = GITHUB_REPO.split('/');
-    if (!owner || !repo) return res.status(500).json({ error: 'GITHUB_REPO must be "owner/repo"' });
+    if (!owner || !repo) return res.status(500).json({ error: 'GITHUB_REPO must be owner/repo' });
 
+    const path = 'data/data.json';
     const apiBase = 'https://api.github.com';
 
-    // 1) Try to fetch existing file to get SHA and current content
-    const getUrl = `${apiBase}/repos/${owner}/${repo}/contents/${encodeURIComponent(FILE_PATH)}?ref=${encodeURIComponent(GITHUB_BRANCH)}`;
+    // Try to GET existing file
+    let existing = [];
+    let sha = null;
+    const getUrl = `${apiBase}/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(GITHUB_BRANCH)}`;
     const getResp = await fetch(getUrl, {
-      method: 'GET',
-      headers: {
-        Authorization: `token ${GITHUB_TOKEN}`,
-        Accept: 'application/vnd.github+json',
-        'User-Agent': 'vercel-serverless'
-      }
+      headers: { Authorization: `token ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' }
     });
 
-    let existingArray = [];
-    let sha = null;
     if (getResp.status === 200) {
-      const fileJson = await getResp.json();
-      // fileJson.content is base64
-      const content = Buffer.from(fileJson.content || '', 'base64').toString('utf8');
-      try {
-        existingArray = JSON.parse(content);
-        if (!Array.isArray(existingArray)) existingArray = [];
-      } catch (e) {
-        existingArray = [];
-      }
-      sha = fileJson.sha;
+      const jf = await getResp.json();
+      sha = jf.sha;
+      const content = jf.content ? Buffer.from(jf.content, 'base64').toString('utf8') : '';
+      try { existing = JSON.parse(content); if (!Array.isArray(existing)) existing = []; } catch (e) { existing = []; }
     } else if (getResp.status === 404) {
-      // file not found -> will create new
-      existingArray = [];
+      existing = [];
     } else {
-      // other error
-      const msg = await getResp.text();
-      return res.status(502).json({ error: 'Failed to read file from GitHub', detail: msg });
+      const txt = await getResp.text();
+      return res.status(502).json({ error: 'Failed reading file from GitHub', detail: txt });
     }
 
-    // append
-    existingArray.push(record);
+    const timestamp = new Date().toISOString();
+    const record = { ...entry, timestamp };
+    existing.push(record);
 
-    // prepare content
-    const newContent = JSON.stringify(existingArray, null, 2);
-    const b64 = Buffer.from(newContent, 'utf8').toString('base64');
+    const newContent = Buffer.from(JSON.stringify(existing, null, 2)).toString('base64');
 
-    // commit (create or update)
-    const putUrl = `${apiBase}/repos/${owner}/${repo}/contents/${encodeURIComponent(FILE_PATH)}`;
-    const commitMessage = `Add form entry at ${timestamp}`;
-
-    const putBody = {
-      message: commitMessage,
-      content: b64,
-      branch: GITHUB_BRANCH
-    };
+    // Create or update file
+    const putUrl = `${apiBase}/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`;
+    const putBody = { message: `Add admission: ${entry.name || 'unknown'} at ${timestamp}`, content: newContent, branch: GITHUB_BRANCH };
     if (sha) putBody.sha = sha;
 
     const putResp = await fetch(putUrl, {
       method: 'PUT',
-      headers: {
-        Authorization: `token ${GITHUB_TOKEN}`,
-        Accept: 'application/vnd.github+json',
-        'User-Agent': 'vercel-serverless',
-        'Content-Type': 'application/json'
-      },
+      headers: { Authorization: `token ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
       body: JSON.stringify(putBody)
     });
 
     if (!putResp.ok) {
-      const errText = await putResp.text();
-      return res.status(502).json({ error: 'Failed to write file to GitHub', detail: errText });
+      const txt = await putResp.text();
+      return res.status(502).json({ error: 'Failed writing file to GitHub', detail: txt });
     }
 
     const putJson = await putResp.json();
-    const filePath = putJson.content?.path || FILE_PATH;
+    return new Promise(resolver => resolver(res.status(200).json({ ok: true, path: putJson.content?.path || path })));
 
-    return res.status(200).json({ ok: true, filePath });
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Internal server error', message: String(err?.message || err) });
+    console.error('save error', err);
+    return res.status(500).json({ error: String(err?.message || err) });
   }
-  }
+}
