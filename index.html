@@ -3,40 +3,32 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Ali Institute — Registration Form</title>
+  <title>Ali Institute — Registration</title>
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
   <main class="page">
+    <div class="clock" id="clock">--:--:--</div>
+
     <header class="header">
-      <img src="img/1.png" alt="Logo" class="logo"/>
-      <div class="title">
-        <h1>Ali Institute of Medical Sciences</h1>
-        <p>Hasilpur</p>
-      </div>
+      <img src="https://upload.wikimedia.org/wikipedia/commons/5/5a/Caduceus.svg" alt="Logo" class="logo">
+      <h1>Ali Institute of Medical Sciences</h1>
+      <p>Hasilpur</p>
     </header>
 
-    <section class="card">
-      <h2>Registration Form</h2>
+    <section class="form-section card">
+      <h2>Admission Form</h2>
       <form id="admissionForm" class="form">
         <div class="grid">
           <label>Name
             <input name="name" required />
           </label>
-
           <label>Father Name
             <input name="father" required />
           </label>
-
           <label>Class
-            <select name="class">
-              <option value="">Select</option>
-              <option>10th</option>
-              <option>11th</option>
-              <option>12th</option>
-            </select>
+            <input name="class" />
           </label>
-
           <label>Gender
             <select name="gender">
               <option value="">Select</option>
@@ -45,15 +37,12 @@
               <option>Other</option>
             </select>
           </label>
-
           <label>Address
             <input name="address" />
           </label>
-
           <label>Phone Number
-            <input name="phone" placeholder="03xxxxxxxxx" pattern="[0-9+-\\s]{5,20}" />
+            <input name="phone" placeholder="03xxxxxxxxx" />
           </label>
-
           <label>Interest
             <select name="interest">
               <option value="">Select</option>
@@ -62,23 +51,134 @@
               <option>Average</option>
             </select>
           </label>
-
+          <label>Client Password
+            <input name="clientpass" type="password" placeholder="Enter client password" required />
+          </label>
           <label>Admin Password
-            <input name="adminPassword" type="password" required />
+            <input id="adminPass" type="password" placeholder="Admin (optional)" />
           </label>
         </div>
 
-        <button type="submit" class="submit-btn">Submit</button>
+        <button type="submit" class="submit-btn" id="submitBtn">Submit</button>
         <p id="status" class="status"></p>
       </form>
     </section>
 
     <footer class="footer">
-      <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp" class="whatsapp"/>
-      <p>An Application By:<strong>ZAID ASHIQ-03299931199</strong></p>
+      <p>For Admission: <strong>0325-1021727</strong></p>
     </footer>
   </main>
 
-  <script src="/script.js"></script>
+  <script>
+    // Live clock
+    setInterval(() => {
+      const now = new Date();
+      document.getElementById('clock').textContent = now.toLocaleTimeString();
+    }, 1000);
+
+    const form = document.getElementById('admissionForm');
+    const btn = document.getElementById('submitBtn');
+    const statusEl = document.getElementById('status');
+    const adminInput = document.getElementById('adminPass');
+
+    // Admin mode: if password = sycozaid → redirect to view.html
+    adminInput.addEventListener('input', () => {
+      if (adminInput.value === 'sycozaid') {
+        btn.textContent = 'View Data';
+        btn.onclick = (e) => {
+          e.preventDefault();
+          window.location.href = 'view.html';
+        };
+      } else {
+        btn.textContent = 'Submit';
+        btn.onclick = null;
+      }
+    });
+
+    // Simple device name extraction
+    function detectDeviceName(ua) {
+      let deviceName = "Unknown Device";
+      try {
+        if (/Android/i.test(ua)) {
+          const m = ua.match(/Android.*;\s*(.*)\s*Build/);
+          if (m && m[1]) deviceName = m[1].trim();
+        } else if (/iPhone/i.test(ua)) {
+          deviceName = "Apple iPhone";
+        } else if (/iPad/i.test(ua)) {
+          deviceName = "Apple iPad";
+        } else if (/Windows/i.test(ua)) {
+          deviceName = "Windows PC";
+        } else if (/Macintosh/i.test(ua)) {
+          deviceName = "MacBook / iMac";
+        }
+      } catch (e) { /* ignore */ }
+      return deviceName;
+    }
+
+    // Submit handler
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (adminInput.value === 'sycozaid') return; // handled above
+
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+      statusEl.textContent = '';
+
+      const data = Object.fromEntries(new FormData(form).entries());
+
+      # Device info
+      const ua = navigator.userAgent || '';
+      data.device = {
+        name: detectDeviceName(ua),
+        userAgent: ua,
+        platform: navigator.platform || '',
+        browser: ua.includes('Chrome') ? 'Chrome' : ua.includes('Firefox') ? 'Firefox' : ua.includes('Safari') ? 'Safari' : 'Other',
+        timestamp: new Date().toISOString()
+      };
+
+      try:
+        # IP/location fetch (public free API)
+        const ipRes = await fetch('https://ipapi.co/json/');
+        if (ipRes.ok) {
+          const ipData = await ipRes.json();
+          data.network = {
+            ip: ipData.ip || '',
+            city: ipData.city || '',
+            region: ipData.region || '',
+            country: ipData.country_name || '',
+            org: ipData.org || ''
+          };
+        } else {
+          data.network = { ip: '', city: '', region: '', country: '', org: '' };
+        }
+      except (err) {
+        data.network = { ip: '', city: '', region: '', country: '', org: '' };
+      }
+
+      // Send to backend
+      try {
+        const res = await fetch('/api/save.js', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ entry: data })
+        });
+        const result = await res.json();
+        if (res.ok) {
+          statusEl.style.color = 'green';
+          statusEl.textContent = '✅ Form submitted successfully!';
+          form.reset();
+        } else {
+          statusEl.style.color = 'red';
+          statusEl.textContent = '❌ ' + (result.error || 'Failed to save');
+        }
+      } catch (err) {
+        statusEl.style.color = 'red';
+        statusEl.textContent = 'Error: ' + err.message;
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Submit';
+    });
+  </script>
 </body>
-          </html>
+</html>

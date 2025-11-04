@@ -1,129 +1,84 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ali Institute – Saved Registrations</title>
-  <link rel="stylesheet" href="/styles.css">
-  <style>
-    .table-container {
-      background: white;
-      border-radius: 20px;
-      box-shadow: 0 5px 25px rgba(0,0,0,0.1);
-      padding: 20px;
-      margin-top: 30px;
-      overflow-x: auto;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      text-align: left;
-    }
-    th, td {
-      padding: 10px 15px;
-      border-bottom: 1px solid #ddd;
-    }
-    th {
-      background: #007bff;
-      color: white;
-      position: sticky;
-      top: 0;
-    }
-    tr:hover {
-      background: #f1f1f1;
-    }
-    .back-btn {
-      display: inline-block;
-      background: #007bff;
-      color: white;
-      padding: 10px 15px;
-      border-radius: 10px;
-      text-decoration: none;
-      margin-bottom: 15px;
-    }
-    .back-btn:hover {
-      background: #0056b3;
-    }
-  </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>View Registrations — Ali Institute</title>
+  <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
   <main class="page">
-    <header class="header">
-      <img src="img/1.png" class="logo" alt="Logo">
-      <div class="title">
-        <h1>Ali Institute of Medical Sciences</h1>
-        <p>Hasilpur</p>
-      </div>
-    </header>
-
-    <section class="card">
-      <a href="/" class="back-btn">← Back to Registration Form</a>
-      <h2>Saved Registrations</h2>
-
-      <div class="table-container">
-        <table id="dataTable">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Name</th>
-              <th>Father Name</th>
-              <th>Class</th>
-              <th>Gender</th>
-              <th>Address</th>
-              <th>Phone</th>
-              <th>Interest</th>
-              <th>Timestamp</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-      <p id="status" class="status"></p>
-    </section>
-
+    <div class="clock" id="clock">--:--:--</div>
+    <h1>Registration Records</h1>
+    <button class="refresh" id="refreshBtn">🔄 Refresh</button>
+    <div class="table-wrap card">
+      <table id="dataTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Name</th>
+            <th>Father</th>
+            <th>Class</th>
+            <th>Gender</th>
+            <th>Phone</th>
+            <th>City</th>
+            <th>Country</th>
+            <th>Device Model</th>
+            <th>Browser</th>
+            <th>Platform</th>
+            <th>IP</th>
+            <th>Time</th>
+          </tr>
+        </thead>
+        <tbody><tr><td colspan="13" style="text-align:center">Loading...</td></tr></tbody>
+      </table>
+    </div>
     <footer class="footer">
-      <p>An Application By:<strong>ZAID ASHIQ-03299931199</strong></p>
+      <p>Ali Institute of Medical Sciences — Hasilpur</p>
     </footer>
   </main>
 
   <script>
+    setInterval(() => {
+      const now = new Date();
+      document.getElementById('clock').textContent = now.toLocaleTimeString();
+    }, 1000);
+
     async function loadData() {
-      const status = document.getElementById('status');
-      const tableBody = document.querySelector('#dataTable tbody');
-      status.textContent = 'Loading data...';
-
+      const tbody = document.querySelector('#dataTable tbody');
+      tbody.innerHTML = '<tr><td colspan="13" style="text-align:center">Loading...</td></tr>';
       try {
-        // Fetch your data.json file directly from GitHub
-        const res = await fetch('/data/data.json');
-        if (!res.ok) throw new Error('Failed to fetch data.json');
-        const data = await res.json();
-
-        tableBody.innerHTML = '';
-        data.forEach((entry, i) => {
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td>${i + 1}</td>
+        const res = await fetch('/api/data.js');
+        if (!res.ok) throw new Error('Failed to load');
+        const records = await res.json();
+        if (!Array.isArray(records) || records.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="13" style="text-align:center">No records found.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = records.map((entry, i) => `
+          <tr>
+            <td>${i+1}</td>
             <td>${entry.name || ''}</td>
             <td>${entry.father || ''}</td>
             <td>${entry.class || ''}</td>
             <td>${entry.gender || ''}</td>
-            <td>${entry.address || ''}</td>
             <td>${entry.phone || ''}</td>
-            <td>${entry.interest || ''}</td>
-            <td>${new Date(entry.timestamp).toLocaleString()}</td>
-          `;
-          tableBody.appendChild(row);
-        });
-
-        status.textContent = data.length
-          ? `Showing ${data.length} records`
-          : 'No admissions yet.';
+            <td>${entry.network?.city || ''}</td>
+            <td>${entry.network?.country || ''}</td>
+            <td>${entry.device?.name || ''}</td>
+            <td>${entry.device?.browser || ''}</td>
+            <td>${entry.device?.platform || ''}</td>
+            <td>${entry.network?.ip || ''}</td>
+            <td>${new Date(entry.device?.timestamp || entry.timestamp || '').toLocaleString()}</td>
+          </tr>
+        `).join('');
       } catch (err) {
-        status.textContent = 'Error loading data: ' + err.message;
+        tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;color:red">Error loading data</td></tr>';
       }
     }
 
+    document.getElementById('refreshBtn').addEventListener('click', loadData);
     loadData();
   </script>
 </body>
-        </html>
+</html>
